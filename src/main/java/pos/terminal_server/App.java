@@ -3,13 +3,18 @@ package pos.terminal_server;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.*;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 
@@ -18,10 +23,7 @@ public class App {
 	private static final int PORT = 12345;
 	
     public static void main(String[] args) {
-    	// Загрузка приватного RSA-ключа сервера
     	try {
-//    		PrivateKey privateKey = loadPrivateKey();
-		
 	        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
 	            System.out.println("Server listening on port " + PORT);
 	            while (true) {
@@ -31,6 +33,12 @@ public class App {
 	                    InputStream inputStream = socket.getInputStream();
 	                    
 	                    DataInputStream dis = new DataInputStream(inputStream);
+//	                    ENCRYPTED Session key
+	                    int encryptedKeyLen = dis.readInt();
+	                    byte[] encryptedSessionKey = new byte[encryptedKeyLen];
+	                    dis.readFully(encryptedSessionKey);
+	                    
+	                    String hexStringEncryptedSessionKey = new String(encryptedSessionKey, StandardCharsets.UTF_8);
 	                    
 	                    int length = dis.readInt();
 	                    byte[] strBytes = new byte[length];
@@ -62,22 +70,22 @@ public class App {
 	                    System.out.println("Get transId: " + transId);
 	                    System.out.println("Get merchantId: " + merchantId);
 	                    System.out.println("Get signatures: " + signature);
-//	                    BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
-//	                    String transactionByte;
-//	                    while ((transactionByte = reader.readLine()) != null) {
-//	                        System.out.println("Get data byte transaction: " + transactionByte);
-//	                    }
-//	                    handleClient(socket, privateKey);
+	                    
+	                    System.out.println("Get ENCRYPTED Session key: " + hexStringEncryptedSessionKey);
+	                 // Расшифровка
+	                    PrivateKey serverPrivateKey = getPrivateKeyFromPEM("C:/My Disc/app/1-JAVA APP/PEM/private_key.pem");
+	                    System.out.println("Private Key: " + serverPrivateKey);
+	                    SecretKey sessionEncryptedKey = decryptSessionKeyRSA(encryptedSessionKey, serverPrivateKey);
+	                    System.out.println("Decoded session key: " + java.util.Base64.getEncoder().encodeToString(sessionEncryptedKey.getEncoded()));
+
 	                } catch (Exception e) {
 	                    e.printStackTrace();
 	                }
 	            }
 	        } catch (IOException e1) {
-				// TODO Auto-generated catch block
 				e1.printStackTrace();
 			}
     	} catch (Exception e) {
-			// TODO Auto-generated catch block
     		System.out.println("Error method loadPrivateKey()");
 			e.printStackTrace();
 		}
@@ -87,7 +95,7 @@ public class App {
         DataInputStream dis = new DataInputStream(socket.getInputStream());
         DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
 
-        // Предположим, сначала приходит длина RSA-зашифрованного ключ
+        // длина RSA-зашифрованного ключ
         int encryptedKeyLen = dis.readInt();
         byte[] encryptedSessionKey = new byte[encryptedKeyLen];
         dis.readFully(encryptedSessionKey);
@@ -104,14 +112,8 @@ public class App {
         // Расшифровка AES-GCM
         byte[] payload = aesGcmDecrypt(encryptedPayload, sessionKey);
 
-        // Предположим, что внутри payload у нас TLV или данные, включая HMAC
-        // Здесь нужно реализовать проверку HMAC, например, извлекая его из payload
-        // Для примера, просто выводим расшифрованные данные
         System.out.println("Decrypted payload: " + new String(payload, "UTF-8"));
 
-        // Проверка HMAC — зависит от формата данных (например, HMAC внутри payload или отдельное поле)
-        // Тут нужно реализовать проверку HMAC, например:
-        // boolean isValid = verifyHMAC(payload, receivedHmac, sharedSecret)
     }
 
     private static byte[] rsaDecrypt(byte[] data, PrivateKey privateKey) throws Exception {
@@ -131,27 +133,6 @@ public class App {
         cipher.init(Cipher.DECRYPT_MODE, key, spec);
         return cipher.doFinal(cipherText);
     }
-
-    private static PrivateKey loadPrivateKey() throws Exception {
-        // Вставьте сюда ваш приватный ключ в PEM-формате (без лишних символов)
-        String privateKeyPEM = "-----BEGIN PRIVATE KEY-----\n ваш базовый64 ключ тут\n -----END PRIVATE KEY-----";
-
-        // Убираем заголовки, переносы и пробелы
-        String privateKeyContent = privateKeyPEM
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
-                .replaceAll("\\s+", "");
-
-        // Декодируем Base64
-        byte[] pkcs8EncodedBytes = Base64.getDecoder().decode(privateKeyContent);
-
-        // Создаем ключ
-        PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(pkcs8EncodedBytes);
-        KeyFactory kf = KeyFactory.getInstance("RSA");
-        return kf.generatePrivate(keySpec);
-    }
-
-    // Реализуйте verifyHMAC() согласно выбранной схеме
     
     
     public static String bytesToHex(byte[] bytes) {
@@ -175,4 +156,36 @@ public class App {
         }
         return data;
     }
+    
+    
+    
+    public static SecretKey decryptSessionKeyRSA(byte[] encryptedSessionKeyBytes, PrivateKey privateKey) throws Exception {
+        // Преобразуем байты в Hex-строку
+        String hexString = new String(encryptedSessionKeyBytes, StandardCharsets.UTF_8);
+        // Декодируем Hex-строку обратно в байты
+        byte[] encryptedBytes = hexStringToBytes(hexString);
+        
+        // Инициализация Cipher для RSA OAEP
+        Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
+        cipher.init(Cipher.DECRYPT_MODE, privateKey);
+        
+        // Расшифровка байтов
+        byte[] sessionKeyBytes = cipher.doFinal(encryptedBytes);
+        
+        // Восстановление SecretKey, AES
+        return new SecretKeySpec(sessionKeyBytes, "AES");
+    }
+    
+
+    public static PrivateKey getPrivateKeyFromPEM(String filename) throws Exception {
+            String pem = new String(Files.readAllBytes(Paths.get(filename)), StandardCharsets.UTF_8);
+            pem = pem.replace("-----BEGIN PRIVATE KEY-----", "")
+                     .replace("-----END PRIVATE KEY-----", "")
+                     .replaceAll("\\s", "");
+            byte[] decoded = Base64.getDecoder().decode(pem);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(decoded);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(spec);
+        }
+
 }
