@@ -6,6 +6,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import java.io.*;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -17,103 +18,114 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpExchange;
 
 public class App {
 	
 	private static final int PORT = 12345;
 	
-    public static void main(String[] args) {
-    	try {
-	        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-	            System.out.println("Server listening on port " + PORT);
-	            while (true) {
-	                try (Socket socket = serverSocket.accept()) {
-	                    System.out.println("Client connected, his socket: " + socket);
-	                    
-	                    InputStream inputStream = socket.getInputStream();
-	                    
-	                    DataInputStream dis = new DataInputStream(inputStream);
-//	                    ENCRYPTED Session key
-	                    int encryptedKeyLen = dis.readInt();
-	                    byte[] encryptedSessionKey = new byte[encryptedKeyLen];
-	                    dis.readFully(encryptedSessionKey);
-	                    
-	                    String hexStringEncryptedSessionKey = new String(encryptedSessionKey, StandardCharsets.UTF_8);
-	                    
-	                    int length = dis.readInt();
-	                    byte[] strBytes = new byte[length];
-	                    dis.readFully(strBytes);
-
-	                    // Преобразуем байты в строку
-	                    String hexString = new String(strBytes, StandardCharsets.UTF_8);
-
-	                    // Теперь преобразуем hex-строку обратно в байты
-	                    byte[] originalBytes = hexStringToBytes(hexString);
-	                    
-	                    // Читаем строку card
-	                    String card = dis.readUTF();
-
-	                    // Читаем сумму
-	                    int amount = dis.readInt();
-
-	                    // Читаем транзакционный ID
-	                    String transId = dis.readUTF();
-
-	                    // Читаем merchantId
-	                    int merchantId = dis.readInt();
-
-	                    String signature = dis.readUTF();
-	                    
-	                    System.out.println("Get data byte transaction: " + hexString);
-	                    System.out.println("Get card: " + card);
-	                    System.out.println("Get amount: " + amount);
-	                    System.out.println("Get transId: " + transId);
-	                    System.out.println("Get merchantId: " + merchantId);
-	                    System.out.println("Get signatures: " + signature);
-	                    
-	                    System.out.println("Get ENCRYPTED Session key: " + hexStringEncryptedSessionKey);
-	                 // Расшифровка
-	                    PrivateKey serverPrivateKey = getPrivateKeyFromPEM("C:/My Disc/app/1-JAVA APP/PEM/private_key.pem");
-	                    System.out.println("Private Key: " + serverPrivateKey);
-	                    SecretKey sessionEncryptedKey = decryptSessionKeyRSA(encryptedSessionKey, serverPrivateKey);
-	                    System.out.println("Decoded session key: " + java.util.Base64.getEncoder().encodeToString(sessionEncryptedKey.getEncoded()));
-
-	                } catch (Exception e) {
-	                    e.printStackTrace();
-	                }
-	            }
-	        } catch (IOException e1) {
-				e1.printStackTrace();
-			}
-    	} catch (Exception e) {
-    		System.out.println("Error method loadPrivateKey()");
-			e.printStackTrace();
-		}
-    }
+    public static void main(String[] args) throws IOException {
+    	HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+        server.createContext("/api/transaction", (HttpExchange exchange) -> {
+            handleTransaction(exchange);
+        });
+        server.start();
+        System.out.println("Server listening on port " + PORT);
+        
+//    	try {
+//    		
+//	        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
+//	            System.out.println("Server listening on port " + PORT);
+//	            while (true) {
+//	                try (Socket socket = serverSocket.accept()) {
+//	                    System.out.println("Client connected, his socket: " + socket);
+//	                    
+//	                    InputStream inputStream = socket.getInputStream();
+//	                    
+//	                    DataInputStream dis = new DataInputStream(inputStream);
+////	                    ENCRYPTED Session key
+//	                    int encryptedKeyLen = dis.readInt();
+//	                    byte[] encryptedSessionKey = new byte[encryptedKeyLen];
+//	                    dis.readFully(encryptedSessionKey);
+//	                    
+//	                    String hexStringEncryptedSessionKey = new String(encryptedSessionKey, StandardCharsets.UTF_8);
+//	                    
+//	                    int length = dis.readInt();
+//	                    byte[] strBytes = new byte[length];
+//	                    dis.readFully(strBytes);
+//
+//	                    // Преобразуем байты в строку
+//	                    String hexString = new String(strBytes, StandardCharsets.UTF_8);
+//
+//	                    // Теперь преобразуем hex-строку обратно в байты
+//	                    byte[] originalBytes = hexStringToBytes(hexString);
+//	                    
+//	                    // Читаем строку card
+//	                    String card = dis.readUTF();
+//
+//	                    // Читаем сумму
+//	                    int amount = dis.readInt();
+//
+//	                    // Читаем транзакционный ID
+//	                    String transId = dis.readUTF();
+//
+//	                    // Читаем merchantId
+//	                    int merchantId = dis.readInt();
+//
+//	                    String signature = dis.readUTF();
+//	                    
+//	                    System.out.println("Get data byte transaction: " + hexString);
+//	                    System.out.println("Get card: " + card);
+//	                    System.out.println("Get amount: " + amount);
+//	                    System.out.println("Get transId: " + transId);
+//	                    System.out.println("Get merchantId: " + merchantId);
+//	                    System.out.println("Get signatures: " + signature);
+//	                    
+//	                    System.out.println("Get ENCRYPTED Session key: " + hexStringEncryptedSessionKey);
+//	                 // Расшифровка
+//	                    PrivateKey serverPrivateKey = getPrivateKeyFromPEM("C:/My Disc/app/1-JAVA APP/PEM/private_key.pem");
+//	                    System.out.println("Private Key: " + serverPrivateKey);
+//	                    SecretKey sessionEncryptedKey = decryptSessionKeyRSA(encryptedSessionKey, serverPrivateKey);
+//	                    System.out.println("Decoded session key: " + java.util.Base64.getEncoder().encodeToString(sessionEncryptedKey.getEncoded()));
+//
+//	                } catch (Exception e) {
+//	                    e.printStackTrace();
+//	                }
+//	            }
+//	        } catch (IOException e1) {
+//				e1.printStackTrace();
+//			}
+//    	} catch (Exception e) {
+//    		System.out.println("Error method loadPrivateKey()");
+//			e.printStackTrace();
+//		}
+    }   
     
-    private static void handleClient(Socket socket, PrivateKey privateKey) throws Exception {
-        DataInputStream dis = new DataInputStream(socket.getInputStream());
-        DataOutputStream dos = new DataOutputStream(socket.getOutputStream());
+    
+    private static void handleTransaction(HttpExchange exchange) throws IOException {
+        if ("POST".equals(exchange.getRequestMethod())) {
+            // Читаем тело запроса
+            InputStream is = exchange.getRequestBody();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+            StringBuilder requestBody = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                requestBody.append(line);
+            }
+            reader.close();
 
-        // длина RSA-зашифрованного ключ
-        int encryptedKeyLen = dis.readInt();
-        byte[] encryptedSessionKey = new byte[encryptedKeyLen];
-        dis.readFully(encryptedSessionKey);
+            System.out.println("Полученные данные: " + requestBody.toString());
+ 
+            String response = "Данные успешно получены: " + requestBody.toString();
 
-        // Расшифровка RSA
-        byte[] sessionKeyBytes = rsaDecrypt(encryptedSessionKey, privateKey);
-        SecretKey sessionKey = new javax.crypto.spec.SecretKeySpec(sessionKeyBytes, "AES");
-
-        // Получение длины зашифрованного payload
-        int encryptedPayloadLen = dis.readInt();
-        byte[] encryptedPayload = new byte[encryptedPayloadLen];
-        dis.readFully(encryptedPayload);
-
-        // Расшифровка AES-GCM
-        byte[] payload = aesGcmDecrypt(encryptedPayload, sessionKey);
-
-        System.out.println("Decrypted payload: " + new String(payload, "UTF-8"));
-
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
+        } else {
+            exchange.sendResponseHeaders(405, -1);
+        }
     }
 
     private static byte[] rsaDecrypt(byte[] data, PrivateKey privateKey) throws Exception {
