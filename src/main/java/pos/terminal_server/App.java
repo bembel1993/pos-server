@@ -105,7 +105,7 @@ public class App {
     
     private static void handleTransaction(HttpExchange exchange) throws IOException {
         if ("POST".equals(exchange.getRequestMethod())) {
-            // Читаем тело запроса
+        	
             InputStream is = exchange.getRequestBody();
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             StringBuilder requestBody = new StringBuilder();
