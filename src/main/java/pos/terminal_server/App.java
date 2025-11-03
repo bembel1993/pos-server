@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpExchange;
+import org.json.JSONObject;
 
 public class App {
 	
@@ -105,7 +106,6 @@ public class App {
     
     private static void handleTransaction(HttpExchange exchange) throws IOException {
         if ("POST".equals(exchange.getRequestMethod())) {
-        	
             InputStream is = exchange.getRequestBody();
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             StringBuilder requestBody = new StringBuilder();
@@ -116,8 +116,22 @@ public class App {
             reader.close();
 
             System.out.println("Полученные данные: " + requestBody.toString());
- 
-            String response = "Данные успешно получены: " + requestBody.toString();
+
+            JSONObject jsonReceived = new JSONObject(requestBody.toString());
+
+            String cardNumber = jsonReceived.getString("cardNumber");
+            int amount = jsonReceived.getInt("amount");
+            String merchantId = jsonReceived.getString("merchantId");
+            String transactionBytesHex = jsonReceived.getString("transactionBytes");
+
+            byte[] transactionBytes = hexStringToByteArray(transactionBytesHex);
+
+            System.out.println("Card Number: " + cardNumber);
+            System.out.println("Amount: " + amount);
+            System.out.println("Merchant ID: " + merchantId);
+            System.out.println("Transaction Bytes: " + new String(transactionBytes));
+
+            String response = "Данные успешно получены и распарсены";
 
             exchange.sendResponseHeaders(200, response.getBytes().length);
             try (OutputStream os = exchange.getResponseBody()) {
@@ -127,6 +141,17 @@ public class App {
             exchange.sendResponseHeaders(405, -1);
         }
     }
+
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                                 + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
+    }
+
 
     private static byte[] rsaDecrypt(byte[] data, PrivateKey privateKey) throws Exception {
         Cipher cipher = Cipher.getInstance("RSA/OAEPWithSHA-256AndMGF1Padding");
