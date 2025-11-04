@@ -19,6 +19,9 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 import com.sun.net.httpserver.HttpServer;
+
+import pos.terminal_server.TransactionData;
+
 import com.sun.net.httpserver.HttpExchange;
 
 import org.json.JSONException;
@@ -122,16 +125,28 @@ public class App {
                 JSONObject jsonReceived = new JSONObject(requestBody.toString());
 
                 String cardNumber = jsonReceived.getString("cardNumber");
-                int amount = jsonReceived.getInt("amount");
+                int amountProd = jsonReceived.getInt("amount");
                 int merchantId = jsonReceived.getInt("merchantId");
                 String transactionBytesHex = jsonReceived.getString("transactionBytes");
 
                 byte[] transactionBytes = hexStringToByteArray(transactionBytesHex);
+                
+                System.out.println("----------- DECODE TRANSACTION ---------------");
+                TransactionData data = decodeTransaction(transactionBytes);
+                String card = data.getCardNumber();
+                int amount = data.getAmount();
+                String transId = data.getTransId();
+                int merchtId = data.getMerchantId();
 
-                System.out.println("cardNumber: " + cardNumber);
-                System.out.println("amount: " + amount);
-                System.out.println("merchantId: " + merchantId);
-                System.out.println("transactionBytes: " + bytesToHex(transactionBytes));
+//                System.out.println("cardNumber: " + cardNumber);
+//                System.out.println("amount: " + amountProd);
+//                System.out.println("merchantId: " + merchantId);
+//                System.out.println("transactionBytes: " + bytesToHex(transactionBytes));
+//                System.out.println("----------- DECODE TRANSACTION ---------------");
+//                System.out.println("Card number mask: " + card);
+//                System.out.println("amount: " + amount);
+//                System.out.println("ID transaction: " + transId);
+//                System.out.println("Merchant ID: " + merchtId);
 
                 String response = "Данные успешно получены и распарсены";
 
@@ -241,5 +256,31 @@ public class App {
             KeyFactory kf = KeyFactory.getInstance("RSA");
             return kf.generatePrivate(spec);
         }
+    
+    
+    public static TransactionData decodeTransaction(byte[] data) {
+        ByteBuffer buffer = ByteBuffer.wrap(data);
+
+        byte[] cardBytes = new byte[20];
+        buffer.get(cardBytes);
+        String card = new String(cardBytes, StandardCharsets.UTF_8).trim();
+
+        int amount = buffer.getInt();
+
+        byte[] transIdBytes = new byte[50];
+        buffer.get(transIdBytes);
+        String transId = new String(transIdBytes, StandardCharsets.UTF_8).trim();
+
+        int merchantId = buffer.getInt();
+
+        System.out.println("Card PAN: " + card);
+        System.out.println("Amount: " + amount);
+        System.out.println("Transaction ID: " + transId);
+        System.out.println("Merchant ID: " + merchantId);
+        
+        TransactionData trData = new TransactionData(card, amount, transId, merchantId);
+        
+        return trData;
+    }
 
 }
