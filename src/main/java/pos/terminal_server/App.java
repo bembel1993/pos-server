@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.Base64;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpExchange;
+
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public class App {
@@ -103,7 +105,6 @@ public class App {
 //		}
     }   
     
-    
     private static void handleTransaction(HttpExchange exchange) throws IOException {
         if ("POST".equals(exchange.getRequestMethod())) {
             InputStream is = exchange.getRequestBody();
@@ -117,32 +118,48 @@ public class App {
 
             System.out.println("Полученные данные: " + requestBody.toString());
 
-            JSONObject jsonReceived = new JSONObject(requestBody.toString());
+            try {
+                JSONObject jsonReceived = new JSONObject(requestBody.toString());
 
-            String cardNumber = jsonReceived.getString("cardNumber");
-            int amount = jsonReceived.getInt("amount");
-            String merchantId = jsonReceived.getString("merchantId");
-            String transactionBytesHex = jsonReceived.getString("transactionBytes");
+                String cardNumber = jsonReceived.getString("cardNumber");
+                int amount = jsonReceived.getInt("amount");
+                int merchantId = jsonReceived.getInt("merchantId");
+                String transactionBytesHex = jsonReceived.getString("transactionBytes");
 
-            byte[] transactionBytes = hexStringToByteArray(transactionBytesHex);
+                byte[] transactionBytes = hexStringToByteArray(transactionBytesHex);
 
-            System.out.println("Card Number: " + cardNumber);
-            System.out.println("Amount: " + amount);
-            System.out.println("Merchant ID: " + merchantId);
-            System.out.println("Transaction Bytes: " + new String(transactionBytes));
+                System.out.println("cardNumber: " + cardNumber);
+                System.out.println("amount: " + amount);
+                System.out.println("merchantId: " + merchantId);
+                System.out.println("transactionBytes: " + bytesToHex(transactionBytes));
 
-            String response = "Данные успешно получены и распарсены";
+                String response = "Данные успешно получены и распарсены";
 
-            exchange.sendResponseHeaders(200, response.getBytes().length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(response.getBytes());
+                exchange.sendResponseHeaders(200, response.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(response.getBytes());
+                }
+            } catch (JSONException e) {
+                e.printStackTrace();
+                String errorResponse = "Ошибка парсинга JSON: " + e.getMessage();
+                exchange.sendResponseHeaders(400, errorResponse.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(errorResponse.getBytes());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                String errorResponse = "Общая ошибка: " + e.getMessage();
+                exchange.sendResponseHeaders(500, errorResponse.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(errorResponse.getBytes());
+                }
             }
         } else {
             exchange.sendResponseHeaders(405, -1);
         }
     }
 
-    public static byte[] hexStringToByteArray(String s) {
+    private static byte[] hexStringToByteArray(String s) {
         int len = s.length();
         byte[] data = new byte[len / 2];
         for (int i = 0; i < len; i += 2) {
@@ -150,7 +167,7 @@ public class App {
                                  + Character.digit(s.charAt(i+1), 16));
         }
         return data;
-    }
+    } 
 
 
     private static byte[] rsaDecrypt(byte[] data, PrivateKey privateKey) throws Exception {
