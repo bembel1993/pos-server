@@ -38,74 +38,6 @@ public class App {
         });
         server.start();
         System.out.println("Server listening on port " + PORT);
-        
-//    	try {
-//    		
-//	        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-//	            System.out.println("Server listening on port " + PORT);
-//	            while (true) {
-//	                try (Socket socket = serverSocket.accept()) {
-//	                    System.out.println("Client connected, his socket: " + socket);
-//	                    
-//	                    InputStream inputStream = socket.getInputStream();
-//	                    
-//	                    DataInputStream dis = new DataInputStream(inputStream);
-////	                    ENCRYPTED Session key
-//	                    int encryptedKeyLen = dis.readInt();
-//	                    byte[] encryptedSessionKey = new byte[encryptedKeyLen];
-//	                    dis.readFully(encryptedSessionKey);
-//	                    
-//	                    String hexStringEncryptedSessionKey = new String(encryptedSessionKey, StandardCharsets.UTF_8);
-//	                    
-//	                    int length = dis.readInt();
-//	                    byte[] strBytes = new byte[length];
-//	                    dis.readFully(strBytes);
-//
-//	                    // Преобразуем байты в строку
-//	                    String hexString = new String(strBytes, StandardCharsets.UTF_8);
-//
-//	                    // Теперь преобразуем hex-строку обратно в байты
-//	                    byte[] originalBytes = hexStringToBytes(hexString);
-//	                    
-//	                    // Читаем строку card
-//	                    String card = dis.readUTF();
-//
-//	                    // Читаем сумму
-//	                    int amount = dis.readInt();
-//
-//	                    // Читаем транзакционный ID
-//	                    String transId = dis.readUTF();
-//
-//	                    // Читаем merchantId
-//	                    int merchantId = dis.readInt();
-//
-//	                    String signature = dis.readUTF();
-//	                    
-//	                    System.out.println("Get data byte transaction: " + hexString);
-//	                    System.out.println("Get card: " + card);
-//	                    System.out.println("Get amount: " + amount);
-//	                    System.out.println("Get transId: " + transId);
-//	                    System.out.println("Get merchantId: " + merchantId);
-//	                    System.out.println("Get signatures: " + signature);
-//	                    
-//	                    System.out.println("Get ENCRYPTED Session key: " + hexStringEncryptedSessionKey);
-//	                 // Расшифровка
-//	                    PrivateKey serverPrivateKey = getPrivateKeyFromPEM("C:/My Disc/app/1-JAVA APP/PEM/private_key.pem");
-//	                    System.out.println("Private Key: " + serverPrivateKey);
-//	                    SecretKey sessionEncryptedKey = decryptSessionKeyRSA(encryptedSessionKey, serverPrivateKey);
-//	                    System.out.println("Decoded session key: " + java.util.Base64.getEncoder().encodeToString(sessionEncryptedKey.getEncoded()));
-//
-//	                } catch (Exception e) {
-//	                    e.printStackTrace();
-//	                }
-//	            }
-//	        } catch (IOException e1) {
-//				e1.printStackTrace();
-//			}
-//    	} catch (Exception e) {
-//    		System.out.println("Error method loadPrivateKey()");
-//			e.printStackTrace();
-//		}
     }   
     
     private static void handleTransaction(HttpExchange exchange) throws IOException {
@@ -124,9 +56,6 @@ public class App {
             try {
                 JSONObject jsonReceived = new JSONObject(requestBody.toString());
 
-                String cardNumber = jsonReceived.getString("cardNumber");
-                int amountProd = jsonReceived.getInt("amount");
-                int merchantId = jsonReceived.getInt("merchantId");
                 String transactionBytesHex = jsonReceived.getString("transactionBytes");
 
                 byte[] transactionBytes = hexStringToByteArray(transactionBytesHex);
@@ -138,17 +67,10 @@ public class App {
                 String transId = data.getTransId();
                 int merchtId = data.getMerchantId();
 
-//                System.out.println("cardNumber: " + cardNumber);
-//                System.out.println("amount: " + amountProd);
-//                System.out.println("merchantId: " + merchantId);
-//                System.out.println("transactionBytes: " + bytesToHex(transactionBytes));
-//                System.out.println("----------- DECODE TRANSACTION ---------------");
-//                System.out.println("Card number mask: " + card);
-//                System.out.println("amount: " + amount);
-//                System.out.println("ID transaction: " + transId);
-//                System.out.println("Merchant ID: " + merchtId);
+                JSONObject responseJson = new JSONObject();
+                responseJson.put("status", "success");
 
-                String response = "Данные успешно получены и распарсены";
+                String response = responseJson.toString();
 
                 exchange.sendResponseHeaders(200, response.getBytes().length);
                 try (OutputStream os = exchange.getResponseBody()) {
@@ -275,7 +197,7 @@ public class App {
 
         System.out.println("Card PAN: " + card);
         System.out.println("Amount: " + amount);
-        System.out.println("Transaction ID: " + transId);
+        System.out.println("UUID: " + transId);
         System.out.println("Merchant ID: " + merchantId);
         
         TransactionData trData = new TransactionData(card, amount, transId, merchantId);
