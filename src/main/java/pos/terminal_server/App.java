@@ -69,6 +69,9 @@ public class App {
 
                 JSONObject responseJson = new JSONObject();
                 responseJson.put("status", "success");
+                responseJson.put("numberСard", card);
+                responseJson.put("amount", amount);
+                responseJson.put("merchtId", merchtId);
 
                 String response = responseJson.toString();
 
